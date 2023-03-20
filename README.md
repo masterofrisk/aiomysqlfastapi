@@ -78,7 +78,7 @@ We will also use Basic Authentication with a username and password to authentica
 
 We have developed a personalized documentation environment that includes examples for each API call. Additionally, users can verify their API authentication by making a call that retrieves only their username, which also serves as an input parameter for the call.
 
-#Minimal Approach
+# Minimal Approach
 
 By using a single file, main.py, our project is more concise and easier to comprehend. The authentication and data manipulation processes are straightforward and intentionally designed to be easily readable and usable. Modifications can be made with minimal effort and quickly applied to a production environment.
 
