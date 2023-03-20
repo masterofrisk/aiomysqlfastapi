@@ -1,4 +1,6 @@
-# MySQL API in Python using the aiomysql and FastAPI frameworks
+# MySQL API in Python 
+
+Using the aiomysql (aiomysql is a "driver" for accessing a MySQL database from the asyncio (PEP-3156/tulip) framework, and it depends on and reuses most parts of PyMySQL) and FastAPI framework.
 
 Simplify your API experience with this single-file main.py solution, featuring seamless and free MySQL integration for efficient database management.
 
