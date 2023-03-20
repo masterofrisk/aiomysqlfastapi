@@ -28,7 +28,7 @@ CREATE TABLE  `tbluser` (
 
 ### Webhooks - tblwhid
 
-CREATE TABLE  `fastapi`.`tblwhid` (
+CREATE TABLE  `tblwhid` (
 
     `id` int(10) unsigned NOT NULL DEFAULT '0',
 
