@@ -12,7 +12,7 @@ app = FastAPI(
     openapi_url="/mypage.html",
     title="MY-API",
     description="My API with only one file.py and free mysql interaction.",
-    version="1.0.0",
+    version="1.0.1",
     redoc_favicon_url="/logo-dark.png"
 )
 security = HTTPBasic()
@@ -317,4 +317,4 @@ async def add_webhook(content: str, request: Request, username: Annotated[str, D
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", log_level="info", port=443, reload=True)
+    uvicorn.run("main:app", log_level="info", port=4343, reload=True, host='0.0.0.0')
