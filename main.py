@@ -1,12 +1,13 @@
-from datetime import datetime
-from fastapi import FastAPI, Response, Depends, Request, status, HTTPException
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from fastapi.param_functions import Query
-import uvicorn
-import json
 import asyncio
-import aiomysql
+import json
+from datetime import datetime
 from typing_extensions import Annotated
+
+import aiomysql
+from fastapi import FastAPI, Response, Depends, Request, status, HTTPException
+from fastapi.param_functions import Query
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+import uvicorn
 
 app = FastAPI(
     openapi_url="/mypage.html",
@@ -16,29 +17,35 @@ app = FastAPI(
     redoc_favicon_url="/logo-dark.png"
 )
 security = HTTPBasic()
-sql1 = 'YOUR_MYSQL_HOST'
-sql2 = 'YOUR_MYSQL_USER'
-sql3 = 'YOUR_MYSQL_PWD'
-sql4 = 'YOUR_MYSQL_SCHEMA'
 
+# You can use the python-dotenv package to load environment variables 
+# from a .env file. You can install it using pip install python-dotenv
+# and then change the following 4 lines.
+sql_host = 'YOUR_MYSQL_HOST'
+sql_user = 'YOUR_MYSQL_USER'
+sql_password = 'YOUR_MYSQL_PWD'
+sql_schema = 'YOUR_MYSQL_SCHEMA'
 
-def sync_dbuser(u: str, t: str):
-    result = asyncio.run(dbuser(u, t))
-    return result
-
-
-async def dbuser(u1: str, t1: str):
-    pool = await aiomysql.create_pool(
-        host=sql1,
-        user=sql2,
-        password=sql3,
-        db=sql4,
+async def create_db_pool():
+    return await aiomysql.create_pool(
+        host=sql_host,
+        user=sql_user,
+        password=sql_password,
+        db=sql_schema,
         autocommit=True
     )
+
+def sync_dbuser(u: str, t: str):
+    loop = asyncio.get_event_loop()
+    result = loop.run_until_complete(dbuser(u, t))
+    return result
+
+async def dbuser(u1: str, t1: str):
+    pool = await create_db_pool()
     async with pool.acquire() as conn:
         async with conn.cursor() as cursor:
             await cursor.execute(
-                "SELECT 'ok' ok FROM tbluser where id='" + u1 + "' and token='" + t1 + "';")
+                "SELECT 'ok' ok FROM tbluser where id=%s and token=%s;", (u1, t1))
             row = await cursor.fetchone()
             if row is None:
                 result = "no"
@@ -47,27 +54,18 @@ async def dbuser(u1: str, t1: str):
     pool.close()
     return result
 
-
 def get_current_username(credentials: Annotated[HTTPBasicCredentials, Depends(security)]):
-    if sync_dbuser(credentials.username, credentials.password) != "ok":
+    try:
+        auth_result = sync_dbuser(credentials.username, credentials.password)
+        if auth_result != "ok":
+            raise ValueError("Incorrect Authentication")
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect Authentication",
+            detail=str(e),
             headers={"WWW-Authenticate": "Basic"},
         )
     return credentials.username
-
-
-def instr(int_start=1, str_text='', str_what=''):
-    return str_text.find(str_what, int_start - 1) + 1
-
-
-def replaceall(str_text, str_old, str_new):
-    x = str_text
-    while instr(1, x, str_old) > 0:
-        x = x.replace(str_old, str_new, )
-    return x
-
 
 @app.get(
     '/',
@@ -89,7 +87,6 @@ def replaceall(str_text, str_old, str_new):
 )
 async def get_indx(username: Annotated[str, Depends(get_current_username)]):
     return {"username": username}
-
 
 @app.get(
     '/webhooks',
@@ -121,33 +118,26 @@ async def get_indx(username: Annotated[str, Depends(get_current_username)]):
         },
     },
     status_code=status.HTTP_200_OK,
-    # tags=["Routes"],
 )
-async def get_webhookids(
-        username: Annotated[str, Depends(get_current_username)],
-):
-    pool = await aiomysql.create_pool(
-        host=sql1,
-        user=sql2,
-        password=sql3,
-        db=sql4,
-        autocommit=True
-    )
+async def get_webhookids(username: str = Depends(get_current_username)):
+    pool = await create_db_pool()
     async with pool.acquire() as conn:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                "SELECT id, wh_url, wh_name, status FROM tblwhid where user_id='" + username + "' order by id;")
-            result = await cursor.fetchall()
+        async with conn.cursor(aiomysql.DictCursor) as cursor:
+            sql_query = """
+            SELECT id, wh_url, wh_name, status
+            FROM tblwhid
+            WHERE user_id=%s
+            ORDER BY id
+            """
+            await cursor.execute(sql_query, (username,))
+            result = await cursor.fetchall()    
     pool.close()
-    await pool.wait_closed()
+    await pool.wait_closed()    
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='There are no webhooks for this user yet')
     else:
-        # result_list = [list(row) for row in result]  # Convert tuple rows to list rows
-        result_list = [{'wh_id': x[0], 'wh_url': x[1], 'wh_name': x[2], 'status': x[3]} for x in result]
-        response_data = {"webhooks": result_list}
+        response_data = {"webhooks": result}
         return Response(content=json.dumps(response_data), media_type="application/json")
-
 
 @app.get(
     '/whcontent',
@@ -184,7 +174,6 @@ async def get_webhookids(
         },
     },
     status_code=status.HTTP_200_OK,
-    # tags=["Routes"],
 )
 async def get_webhooks(
         username: Annotated[str, Depends(get_current_username)],
@@ -194,32 +183,26 @@ async def get_webhooks(
                            description="The maximum number of webhook contents that can be retrieved per API call is 100 and cannot be exceeded.",
                            title="Limit"),
 ):
-    pool = await aiomysql.create_pool(
-        host=sql1,
-        user=sql2,
-        password=sql3,
-        db=sql4,
-        autocommit=True
-    )
-    if limit > 100:
-        limit = 100
+    pool = await create_db_pool()
+    if limit > 100: limit = 100    
     async with pool.acquire() as conn:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                "SELECT id, content, ip, api, dt, wh_id FROM tblwh where id>=" + str(id) + " and wh_id='" + str(
-                    whid) + "' and user_id='" + username + "' order by id limit " + str(limit) + ";")
-            result = await cursor.fetchall()
+        async with conn.cursor(aiomysql.DictCursor) as cursor:
+            sql_query = """
+            SELECT id, content, ip, api, dt, wh_id
+            FROM tblwh
+            WHERE id>=%s AND wh_id=%s AND user_id=%s
+            ORDER BY id
+            LIMIT %s
+            """
+            await cursor.execute(sql_query, (id, whid, username, limit))
+            result = await cursor.fetchall()    
     pool.close()
-    await pool.wait_closed()
+    await pool.wait_closed()    
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='There are no webhooks for this user yet')
     else:
-        # result_list = [list(row) for row in result]  # Convert tuple rows to list rows
-        result_list = [{'id': x[0], 'content': x[1], 'ip': x[2], 'api': x[3], 'dt': x[4], 'wh_id': x[5]} for x in
-                       result]
-        response_data = {"whcontent": result_list}
+        response_data = {"whcontent": result}
         return Response(content=json.dumps(response_data), media_type="application/json")
-
 
 @app.get(
     '/whcontent/{id}',
@@ -248,28 +231,22 @@ async def get_webhook(
         username: Annotated[str, Depends(get_current_username)],
         id: int
 ):
-    pool = await aiomysql.create_pool(
-        host=sql1,
-        user=sql2,
-        password=sql3,
-        db=sql4,
-        autocommit=True
-    )
+    pool = await create_db_pool()    
     async with pool.acquire() as conn:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                "SELECT id, content, ip, api, dt, wh_id FROM tblwh where id=" + str(
-                    id) + " and user_id='" + username + "';")
-            result = await cursor.fetchone()
+        async with conn.cursor(aiomysql.DictCursor) as cursor:
+            sql_query = """
+            SELECT id, content, ip, api, dt, wh_id
+            FROM tblwh
+            WHERE id=%s AND user_id=%s
+            """
+            await cursor.execute(sql_query, (id, username))
+            result = await cursor.fetchone()    
     pool.close()
-    await pool.wait_closed()
+    await pool.wait_closed()    
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='The webhook id does not exist for such user')
     else:
-        response_data = {'id': result[0], 'content': result[1], 'ip': result[2], 'api': result[3], 'dt': result[4],
-                         'wh_id': result[5]}
-        return Response(content=json.dumps(response_data), media_type="application/json")
-
+        return Response(content=json.dumps(result), media_type="application/json")
 
 @app.post(
     '/whcontent',
@@ -292,29 +269,35 @@ async def get_webhook(
     },
     status_code=status.HTTP_201_CREATED
 )
-async def add_webhook(content: str, request: Request, username: Annotated[str, Depends(get_current_username)]):
-    pool = await aiomysql.create_pool(
-        host=sql1,
-        user=sql2,
-        password=sql3,
-        db=sql4,
-        autocommit=True
-    )
+async def add_webhook(
+    content: str, 
+    request: Request, 
+    username: Annotated[str, Depends(get_current_username)]
+):
+    pool = await create_db_pool()
     client_host = request.client.host
-    now = datetime.now()
+    now = datetime.now()    
     async with pool.acquire() as conn:
         async with conn.cursor() as cursor:
+            sql_query = """
+            INSERT INTO tblwh(content, ip, api, dt, user_id, wh_id)
+            VALUES (%s, %s, TRUE, %s, %s, 0)
+            """
             result = await cursor.execute(
-                "Insert Into tblwh(content,ip,api,dt,user_id, wh_id) Values(trim(both '''' from Quote('" + content.replace(
-                    "'", "''") + "')),'" + client_host + "',true,'" + now.strftime(
-                    "%Y-%m-%d %H:%M:%S") + "'," + username + ",0);")
+                sql_query,
+                (
+                    content,
+                    client_host,
+                    now.strftime("%Y-%m-%d %H:%M:%S"),
+                    username,
+                ),
+            )            
     pool.close()
-    await pool.wait_closed()
+    await pool.wait_closed()    
     if result is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='The webhook could not be post')
     else:
         return {"result": "ok"}
 
-
 if __name__ == "__main__":
-    uvicorn.run("main:app", log_level="info", port=4343, reload=True, host='0.0.0.0')
+    uvicorn.run(app, log_level="info", port=4343, reload=True, host='0.0.0.0')
