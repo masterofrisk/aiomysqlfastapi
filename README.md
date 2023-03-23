@@ -9,65 +9,41 @@ Simplify your API experience with this single-file main.py solution, featuring s
 This is a hypothetical example of a Webhook to API service. In this scenario, we will be developing the API that retrieves and inserts data to our MySQL database. The webhook system for this example is operating in a separate environment from the MySQL database. To facilitate understanding, we have three tables: Users (tbluser), Webhooks (tblwhid), and Webhook Contents (tblwh). Their structures are outlined below.
 
 ### Users - tbluser
-
+```mysql
 CREATE TABLE  `tbluser` ( 
-
-    `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-
-    `email` varchar(45) NOT NULL,
-
-    `phone` varchar(45) NOT NULL,  
-
-    `token` varchar(45) NOT NULL,
-
-    `status` tinyint(3) unsigned NOT NULL DEFAULT '0',
-    
-    `pwd` varchar(45) NOT NULL,
-
-    PRIMARY KEY (`id`)
-
+    `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+    `email` varchar(45) NOT NULL,
+    `phone` varchar(45) NOT NULL,  
+    `token` varchar(45) NOT NULL,
+    `status` tinyint(3) unsigned NOT NULL DEFAULT '0',
+    `pwd` varchar(45) NOT NULL,
+    PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
+```
 ### Webhooks - tblwhid
-
+```mysql
 CREATE TABLE  `tblwhid` (
-
-    `id` int(10) unsigned NOT NULL DEFAULT '0',
-
-    `user_id` int(10) unsigned NOT NULL,
-
-    `wh_url` varchar(255) NOT NULL,
-
-    `wh_name` varchar(45) NOT NULL,
-
-    `status` tinyint(1) NOT NULL,
-
-    PRIMARY KEY (`id`)
-
+    `id` int(10) unsigned NOT NULL DEFAULT '0',
+    `user_id` int(10) unsigned NOT NULL,
+    `wh_url` varchar(255) NOT NULL,
+    `wh_name` varchar(45) NOT NULL,
+    `status` tinyint(1) NOT NULL,
+    PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
+```
 ### Webhook Contents - tblwh
-
+```mysql
 CREATE TABLE  `tblwh` (
-
-    `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-
-    `content` longtext NOT NULL,
-
-    `ip` varchar(15) NOT NULL,
-
-    `api` tinyint(1) NOT NULL,
-
-    `dt` varchar(30) NOT NULL,
-
-    `user_id` int(10) unsigned NOT NULL,
-
-    `wh_id` int(10) unsigned NOT NULL,
-
-    PRIMARY KEY (`id`)
-
-) ENGINE=InnoDB AUTO_INCREMENT=27 DEFAULT CHARSET=latin1;
-
+    `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+    `content` longtext NOT NULL,
+    `ip` varchar(15) NOT NULL,
+    `api` tinyint(1) NOT NULL,
+    `dt` varchar(30) NOT NULL,
+    `user_id` int(10) unsigned NOT NULL,
+    `wh_id` int(10) unsigned NOT NULL,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+```
 # How it works
 
 Our service's users don't need to set up their own webhook servers to integrate with services such as Twilio for WhatsApp, Stripe for payment processing, or Active Campaign for marketing automation. Instead, they can use our service to receive webhook content and make periodic API calls from their non-public servers or computers to retrieve the information.
